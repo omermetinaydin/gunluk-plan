@@ -6,10 +6,8 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0a1733">
 <title>Günlük Plan</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&display=swap">
 <style>
+@font-face{font-family:Outfit;src:url(fonts/Outfit.ttf) format("truetype");font-weight:100 900;font-display:swap}
 :root{--navy:#0a1733;--navy2:#0d1d42;--g1:#15854a;--g2:#22b45f;--ink:#f2f5fb;--mute:rgba(242,245,251,.5);color-scheme:dark}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:var(--navy);color:var(--ink);font-family:Outfit,Roboto,"Segoe UI",-apple-system,"Helvetica Neue",sans-serif;font-weight:500;-webkit-font-smoothing:antialiased}
@@ -51,6 +49,9 @@ body.del .x{opacity:.9;pointer-events:auto}
 .dots i.a{background:#fff}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 44px);z-index:6;max-width:88vw;padding:10px 18px;border-radius:999px;background:rgba(5,12,30,.78);color:var(--ink);font-size:14px;font-weight:600;text-align:center;opacity:0;transform:translate(-50%,10px);pointer-events:none;transition:opacity .3s,transform .3s}
 .toast.s{opacity:1;transform:translate(-50%,0)}
+.undo{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 44px);z-index:6;display:flex;align-items:center;gap:8px;padding:12px 22px;border:0;border-radius:999px;background:rgba(5,12,30,.78);color:var(--ink);font:inherit;font-size:15px;font-weight:600;opacity:0;transform:translate(-50%,10px);pointer-events:none;transition:opacity .3s,transform .3s}
+.undo.s{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.undo svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 @media (prefers-reduced-motion:reduce){.fill,.row{transition-duration:.01s}}
 </style>
 </head>
@@ -70,16 +71,17 @@ body.del .x{opacity:.9;pointer-events:auto}
 </div>
 <div class="dots" id="dots"></div>
 <div class="toast" id="toast"></div>
+<button class="undo" id="undo"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>Geri al</button>
 <script>
 (()=>{
 const $=id=>document.getElementById(id);
 const pg=$('pages'),fill=$('fill'),msg=$('msg'),dots=$('dots'),toastEl=$('toast');
-const bAdd=$('add'),bClr=$('clr'),bDel=$('del'),bTick=$('tick');
+const bAdd=$('add'),bClr=$('clr'),bDel=$('del'),bTick=$('tick'),bUndo=$('undo');
 const KEY='gunluk-plan-v1',MAX=5;
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()};
 const probe=document.createElement('div');probe.contentEditable='plaintext-only';
 const EDIT=probe.contentEditable==='plaintext-only'?'plaintext-only':'true';
-let S={date:today(),tasks:[],locked:false},delMode=false,armed=false,pend={},els={},armT,toastT,need=1;
+let S={date:today(),tasks:[],locked:false},delMode=false,armed=false,pend={},els={},armT,toastT,need=1,undoStack=[],undoT;
 try{const r=JSON.parse(localStorage.getItem(KEY)||'null');if(r&&r.date===today()){S=r;S.tasks=(S.tasks||[]).filter(t=>t.text&&t.text.trim())}}catch(e){}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const uid=()=>Math.random().toString(36).slice(2,9);
@@ -88,7 +90,18 @@ const real=()=>S.tasks.filter(t=>t.text.trim());
 const visible=()=>S.tasks.filter(t=>!t.done||pend[t.id]);
 const lockMsg=()=>'Bugün '+real().length+' görev eklendi. Daha fazla ekleyemezsin.';
 
-function toast(m){toastEl.textContent=m;toastEl.classList.add('s');clearTimeout(toastT);toastT=setTimeout(()=>toastEl.classList.remove('s'),2400)}
+function toast(m){hideUndo();toastEl.textContent=m;toastEl.classList.add('s');clearTimeout(toastT);toastT=setTimeout(()=>toastEl.classList.remove('s'),2400)}
+
+function buzz(k){try{if(window.Haptic){k==='ok'?Haptic.success():Haptic.tick()}else if(navigator.vibrate){navigator.vibrate(k==='ok'?[15,60,25]:12)}}catch(e){}}
+function hideUndo(){bUndo.classList.remove('s')}
+function showUndo(id){undoStack.push(id);bUndo.classList.add('s');clearTimeout(undoT);undoT=setTimeout(()=>{undoStack=[];hideUndo()},3500)}
+function undo(){
+  while(undoStack.length){
+    const id=undoStack.pop(),t=find(id);
+    if(t&&t.done){t.done=false;clearTimeout(pend[id]);delete pend[id];save();render();progress();buzz('tick');break}
+  }
+  if(!undoStack.length)hideUndo();
+}
 
 function mk(t){
   const r=document.createElement('div');r.className='row';r.dataset.id=t.id;
@@ -131,7 +144,7 @@ function disarm(){armed=false;clearTimeout(armT);bClr.classList.remove('armed')}
 function toggle(id){
   const t=find(id);if(!t)return;
   t.done=!t.done;
-  if(t.done)pend[id]=setTimeout(()=>{delete pend[id];render();setDel(delMode)},700);
+  if(t.done){pend[id]=setTimeout(()=>{delete pend[id];render();setDel(delMode)},700);buzz(real().every(x=>x.done)?'ok':'tick');showUndo(id)}
   else{clearTimeout(pend[id]);delete pend[id]}
   save();render();progress();
 }
@@ -173,6 +186,7 @@ bAdd.onclick=()=>{
   els[t.id].querySelector('.txt').focus();
 };
 bDel.onclick=()=>setDel(!delMode);
+bUndo.onclick=undo;
 bTick.onclick=()=>{
   if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
   if(!real().length){toast('Önce bir görev ekle');return}

@@ -4,11 +4,13 @@ Tasarım `app/src/main/assets/index.html` içinde; uygulama onu bir WebView'da a
 Görevler telefonda saklanır, her gün sıfırlanır.
 
 ## APK almak (kurulum gerektirmez)
-1. github.com'da boş bir depo oluştur, bu klasörün içindekileri yükle (`.github` klasörü dahil).
+1. github.com'da bir depo oluştur, bu klasörün içindekileri yükle (`.github` klasörü dahil).
 2. Depoda Actions sekmesi → Build APK → Run workflow.
-3. İş bitince sayfanın altındaki Artifacts bölümünden GunlukPlan-apk dosyasını indir, zip'ten çıkan app-debug.apk dosyasını telefona at ve yükle.
+3. İş bitince Artifacts bölümünden GunlukPlan-apk dosyasını indir, zip'ten çıkan app-debug.apk dosyasını telefona at ve yükle.
 
-## Android Studio ile
-Klasörü Android Studio'da aç, Gradle 8.9 ile eşitle, ardından Build → Build APK(s).
+Yeni sürümü yüklemeden önce eski uygulamayı sil (her derlemede imza değişir).
 
-Not: Yazı tipi (Outfit) internetten yüklenir; bağlantı yoksa Roboto'ya düşer.
+## Özellikler
+- Tamamlayınca 3,5 saniye "Geri al"
+- Tamamlarken hafif titreşim, hepsi bitince çift titreşim
+- Outfit yazı tipi derleme sırasında indirilip uygulamaya gömülür
